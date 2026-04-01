@@ -395,6 +395,7 @@ const EditorPage = () => {
 
         if (!localStreamRef.current) {
           console.error("❌ No local stream available");
+          console.log();
           return;
         }
         const peer = addPeer(signal, callerID, localStreamRef.current);

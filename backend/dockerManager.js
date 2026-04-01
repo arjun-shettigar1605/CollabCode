@@ -16,53 +16,52 @@ const languageConfig = {
     command: (filename) => [
       "sh",
       "-c",
-      `apk add --no-cache sqlite && sqlite3 mydatabase.db < init.sql && sqlite3 -json mydatabase.db < ${filename} || sqlite3 -header -column mydatabase.db < ${filename}`,
+      `set -e; apk add --no-cache sqlite; sqlite3 mydatabase.db < init.sql; if sqlite3 -json mydatabase.db < ${filename} 2>/dev/null; then exit 0; else sqlite3 -header -column mydatabase.db < ${filename}; fi`,
     ],
-
     extension: ".sql",
     // This initFile content will be written to init.sql
     initFile: `
-      DROP TABLE IF EXISTS Customers;
-      CREATE TABLE Customers (
-        customer_id INT PRIMARY KEY, 
-        first_name VARCHAR(100), 
-        last_name VARCHAR(100), 
-        age INT, 
-        country VARCHAR(100)
-      );
-      INSERT INTO Customers (customer_id, first_name, last_name, age, country) VALUES 
-      (1, 'John', 'Doe', 31, 'USA'), 
-      (2, 'Robert', 'Luna', 22, 'USA'), 
-      (3, 'David', 'Robinson', 22, 'UK'), 
-      (4, 'John', 'Reinhardt', 25, 'UK'), 
-      (5, 'Betty', 'Doe', 28, 'USA');
-      
-      DROP TABLE IF EXISTS Orders;
-      CREATE TABLE Orders (
-        order_id INT PRIMARY KEY, 
-        item VARCHAR(100), 
-        amount INT, 
-        customer_id INT,
-        FOREIGN KEY(customer_id) REFERENCES Customers(customer_id)
-      );
-      INSERT INTO Orders (order_id, item, amount, customer_id) VALUES 
-      (1, 'Keyboard', 100, 1), 
-      (2, 'Mouse', 150, 1), 
-      (3, 'Monitor', 80, 2), 
-      (4, 'Keyboard', 100, 3);
-      
-      DROP TABLE IF EXISTS Shippings;
-      CREATE TABLE Shippings (
-        shipping_id INT PRIMARY KEY, 
-        status VARCHAR(100), 
-        customer_id INT,
-        FOREIGN KEY(customer_id) REFERENCES Customers(customer_id)
-      );
-      INSERT INTO Shippings (shipping_id, status, customer_id) VALUES 
-      (1, 'Pending', 1),
-      (2, 'Delivered', 2),
-      (3, 'Delivered', 3);
-    `,
+    DROP TABLE IF EXISTS Customers;
+    CREATE TABLE Customers (
+      customer_id INT PRIMARY KEY, 
+      first_name VARCHAR(100), 
+      last_name VARCHAR(100), 
+      age INT, 
+      country VARCHAR(100)
+    );
+    INSERT INTO Customers (customer_id, first_name, last_name, age, country) VALUES 
+    (1, 'John', 'Doe', 31, 'USA'), 
+    (2, 'Robert', 'Luna', 22, 'USA'), 
+    (3, 'David', 'Robinson', 22, 'UK'), 
+    (4, 'John', 'Reinhardt', 25, 'UK'), 
+    (5, 'Betty', 'Doe', 28, 'USA');
+    
+    DROP TABLE IF EXISTS Orders;
+    CREATE TABLE Orders (
+      order_id INT PRIMARY KEY, 
+      item VARCHAR(100), 
+      amount INT, 
+      customer_id INT,
+      FOREIGN KEY(customer_id) REFERENCES Customers(customer_id)
+    );
+    INSERT INTO Orders (order_id, item, amount, customer_id) VALUES 
+    (1, 'Keyboard', 100, 1), 
+    (2, 'Mouse', 150, 1), 
+    (3, 'Monitor', 80, 2), 
+    (4, 'Keyboard', 100, 3);
+    
+    DROP TABLE IF EXISTS Shippings;
+    CREATE TABLE Shippings (
+      shipping_id INT PRIMARY KEY, 
+      status VARCHAR(100), 
+      customer_id INT,
+      FOREIGN KEY(customer_id) REFERENCES Customers(customer_id)
+    );
+    INSERT INTO Shippings (shipping_id, status, customer_id) VALUES 
+    (1, 'Pending', 1),
+    (2, 'Delivered', 2),
+    (3, 'Delivered', 3);
+  `,
   },
   python: {
     image: "python:3.9-slim",
@@ -202,10 +201,15 @@ const runCodeInContainer = async (language, code) => {
     const executionPromise = container.wait();
 
     // Promise to handle timeout
+    const timeoutDuration = effectiveLanguage === "sqlite" ? 30000 : 10000; // 30s for SQLite, 10s for others
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
-        reject(new Error("Execution timed out after 10 seconds."));
-      }, 10000);
+        reject(
+          new Error(
+            `Execution timed out after ${timeoutDuration / 1000} seconds.`
+          )
+        );
+      }, timeoutDuration);
     });
 
     // Wait for either the container to finish or the timeout
